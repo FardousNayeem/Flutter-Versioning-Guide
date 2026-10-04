@@ -1,6 +1,6 @@
 # Flutter Versioning Guide
 
-This is a easy way to maintain versioning of flutter apps as well as tracking build numbers.
+This is an easy way to maintain versioning of flutter apps as well as tracking build numbers.
 
 How to build release binaries of a Flutter app so that every build:
 
