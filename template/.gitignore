@@ -1,0 +1,9 @@
+# Merge into the app's .gitignore. tool/build.sh refuses a store-tier build from
+# a dirty tree, so anything a build or CI writes must be ignored here.
+/build/
+/.dart_tool/
+/dist/
+/tool/.build.lock
+/android/key.properties
+*.jks
+*.keystore

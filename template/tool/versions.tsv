@@ -1,0 +1,25 @@
+# Every release build of this app, oldest first. Written by tool/build.sh, which
+# appends one row after each successful build. The next build of a tier takes
+# its versionName from that tier's last row and its versionCode from that
+# tier's highest code. Edit by hand only to open a tier or correct history.
+#
+# Tab-separated. Columns:
+#
+#   date     build date, YYYY-MM-DD
+#   tier     staging, prod, ... Each tier has its own applicationId and bundle
+#            identifier, so stores and devices count its codes separately.
+#   name     versionName / CFBundleShortVersionString, shown to users
+#   code     versionCode / CFBundleVersion. Never goes down within a tier.
+#   git      short commit the build started from, +dirty if uncommitted
+#   dep      commit of TRACKED_GIT_DEP the build compiled, or -
+#   filed    artefact file names in OUT_DIR, comma-separated
+#   note     free text from NOTE, or -
+#
+# OPENING A TIER: add one row by hand with the tier's current name and code.
+# For an app already on a store, the code is the highest the store holds for
+# that package; read it from the store console, never guess it. Mark the row
+# in the note column, for example "opening row".
+#
+# date	tier	name	code	git	dep	filed	note
+2026-01-01	staging	1.0.0	1	-	-	-	opening row
+2026-01-01	prod	1.0.0	1	-	-	-	opening row
