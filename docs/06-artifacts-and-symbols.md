@@ -24,6 +24,17 @@ myapp-staging-v1.4.2+57.apk
 
 Copies go to `OUT_DIR` (default `dist/`, ignored by git). Set `OUT_DIR=~/Builds` to collect builds from several projects in one place.
 
+## Checking the artifact
+
+Before a file is filed, `build.sh` opens it and reads `versionCode` (and `targetSdkVersion`) back out, so a hard-coded value in Gradle or Xcode cannot ship under the ledger's number ([05, step 11](05-anatomy.md#11-read-the-version-back)). The same checks by hand:
+
+```bash
+aapt2 dump badging dist/myapp-staging-v1.4.2+57.apk | head -1
+bundletool dump manifest --bundle=dist/myapp-prod-v1.4.2+58.aab --xpath=/manifest/@android:versionCode
+```
+
+The ledger keeps each filed file's size and SHA-256 prefix. `tool/ledger.sh which <file>` uses the hash to name the build behind any copy of a file, whatever it has been renamed to ([03](03-ledger.md#which-build-is-this-file)).
+
 ## App bundle or APK
 
 | Use | Build |

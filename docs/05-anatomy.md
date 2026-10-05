@@ -8,7 +8,7 @@ The full script is [`template/tool/build.sh`](../template/tool/build.sh). This d
 flowchart TD
     A[1. Parse arguments] --> B[2. Config declares the same tier?]
     B -->|no| X[exit 1]
-    B --> C[3. Read git state; store tier and dirty?]
+    B --> C[3. Read git state; store tier and dirty, or off STORE_BRANCHES?]
     C -->|yes| X
     C --> D[4. Take build lock]
     D -->|held| X
@@ -21,12 +21,15 @@ flowchart TD
     G --> H[8. Delete Dart build state]
     H --> I[9. flutter build]
     I -->|fails| X
-    I --> J[10. Find new artifacts, copy to OUT_DIR]
+    I --> J[10. Find new artifacts]
     J -->|none| X
-    J --> K[11. Append ledger row]
+    J --> V[11. Read versionCode and targetSdk back out]
+    V -->|wrong code / targetSdk too low on store tier| X
+    V --> F2[12. Copy to OUT_DIR, hash, measure]
+    F2 --> K[13. Append ledger row]
 ```
 
-Steps 1 to 6 change nothing in the project apart from creating the lock directory. Step 7 can rewrite `pubspec.lock`. Step 11 is the only step that writes the ledger, and it runs only after an artifact exists.
+Steps 1 to 6 change nothing in the project apart from creating the lock directory. Step 7 can rewrite `pubspec.lock`. Step 13 is the only step that writes the ledger, and it runs only after an artifact exists and carries the version the row will claim.
 
 ## Settings block
 
@@ -34,10 +37,12 @@ Steps 1 to 6 change nothing in the project apart from creating the lock director
 APP_SLUG=myapp            # used in artifact file names
 DEFAULT_TIER=staging      # tier built when --tier is not given
 STORE_TIERS="prod"        # tiers uploaded to a store: a code can never be reused
+STORE_BRANCHES="main"     # branches a store-tier build may start from; empty allows any
 TIER_MECHANISM=flavor     # flavor: --flavor <tier>; property: -Ptier=<tier> (Android only)
 TRACKED_GIT_DEP=""        # a git dependency that follows a branch; empty to disable
 OBFUSCATE=1               # 1: --obfuscate --split-debug-info, symbols kept per build
 MAX_CODE=2100000000       # Google Play's upper limit for versionCode
+MIN_TARGET_SDK=36         # store tiers: lowest targetSdk Google Play accepts
 ```
 
 These are the only lines to edit when adopting the script. The default tier is the non-store tier: a bare invocation can never produce a production build.
@@ -80,7 +85,7 @@ done
 
 Three groups:
 
-- **Own options** (`--tier`, `--bump`, `--reuse-code`, `--allow-dirty`, `--dry-run`) are consumed and never reach Flutter.
+- **Own options** (`--tier`, `--bump`, `--patch`, `--minor`, `--major`, `--reuse-code`, `--allow-dirty`, `--allow-branch`, `--dry-run`) are consumed and never reach Flutter. `--patch`, `--minor` and `--major` set `bump=1`: a new name on an old code is rejected by the store.
 - **Owned flags** are refused. If the caller could also pass `--build-number`, the artifact would carry one number and the ledger another.
 - **Everything else** (`--release`, `--target-platform`, `--no-tree-shake-icons`, ...) is passed through unchanged, so new Flutter flags work without editing the script.
 
@@ -118,6 +123,14 @@ Read **before** step 7 rewrites `pubspec.lock` and step 11 appends to the ledger
 
 A store-tier build from uncommitted code cannot be reproduced, so it is refused unless `--allow-dirty` is passed. This also enforces committing the ledger: the previous build's row is an uncommitted change.
 
+```bash
+branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo '-')
+```
+
+A store-tier build must also start from a branch in `STORE_BRANCHES` (default `main`), unless `--allow-branch` is passed. A production build from a feature branch ships code that was never merged, and its commit can disappear in a later rebase. A detached HEAD reads as `-` and is refused the same way.
+
+Under `--dry-run` both checks print `would refuse: ...` instead of exiting, so a dry run lists every problem the real build would stop on.
+
 ## 4. One build at a time
 
 ```bash
@@ -129,7 +142,14 @@ trap 'rm -f "$stamp"; rmdir "$lock" 2>/dev/null || true' EXIT
 
 Two builds started together would read the same ledger and take the same "next" code. `mkdir` is atomic on every POSIX filesystem and, unlike `flock`, exists on macOS. The lock is taken before the ledger is read. The `trap` removes it on any exit, including failure.
 
-`stamp` is an empty file whose modification time marks the start of the build. Step 10 uses it.
+`stamp` is an empty file whose modification time marks the start of the build. Step 10 uses it. `scratch` is a temporary directory for step 11.
+
+```bash
+start_date=$(date +%Y-%m-%d)
+start_time=$(date +%H:%M:%S%z)
+```
+
+Both are read here, at the start, so a build that runs past midnight is recorded under the day it began.
 
 ## 5. Version from the ledger
 
@@ -149,11 +169,23 @@ max_code=$(awk -F'\t' -v s="$tier" '$1!~/^#/ && NF>=4 && $2==s && $4+0>m {m=$4+0
 No row means no known starting point. The script never invents one: on a store, a guessed code is either a rejected upload or a build every existing install refuses.
 
 ```bash
-name=${VERSION_NAME:-$last_name}
+if [ -n "$part" ]; then
+  IFS=. read -r major minor patch <<EOF
+$last_name
+EOF
+  case "$part" in
+    patch) patch=$((patch + 1)) ;;
+    minor) minor=$((minor + 1)); patch=0 ;;
+    major) major=$((major + 1)); minor=0; patch=0 ;;
+  esac
+  name=$major.$minor.$patch
+else
+  name=${VERSION_NAME:-$last_name}
+fi
 echo "$name" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || die "versionName '$name' is not MAJOR.MINOR.PATCH"
 ```
 
-The name format both stores accept.
+With `--patch`, `--minor` or `--major` the name is computed from the tier's last name, so a release needs no typed version. Passing one of them together with `VERSION_NAME` is refused, since both would set the name. The last line checks the name format both stores accept.
 
 ```bash
 if [ "$bump" = 1 ]; then
@@ -194,6 +226,8 @@ The command is built as a bash array, so arguments containing spaces survive int
 One `--tier` value sets the flavor (application id, label, icon), the config file (backend URLs) and, through step 5, the version series.
 
 `--dry-run` prints the command and exits here, before the lock or any write.
+
+Step 8 also records the Flutter version (`flutter --version --machine`, field `frameworkVersion`) for the ledger's `flutter` column.
 
 ## 7. Tracked git dependency
 
@@ -247,15 +281,40 @@ cp -f "$a" "$out_dir/$base.$ext"
 
 The copy is named `myapp-prod-v1.4.2+58.aab`. Tier, name and code are in the name, so files from different tiers or codes never overwrite each other. A rebuild in place overwrites the earlier file of the same name and code, which is the same build of the same version.
 
-## 11. Record
+## 11. Read the version back
 
 ```bash
-note=$(printf '%s' "${NOTE:--}" | tr '\t\n' '  ')
-printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-  "$(date +%Y-%m-%d)" "$tier" "$name" "$code" "$git_sha" "$dep_sha" "$filed_list" "$note" >> "$ledger"
+got=$(read_stamp "$a" || true)
+[ "$got_code" = "$code" ] || die "$(basename "$a") carries versionCode $got_code, but this build is $code. ..."
 ```
 
-Written last, so a row means an artifact exists. Tabs and newlines in `NOTE` would add columns or rows and corrupt every later read, so they are replaced with spaces.
+`--build-number` reaches the binary only through `versionCode = flutter.versionCode` in Gradle and `FLUTTER_BUILD_NUMBER` in Xcode. A hard-coded `versionCode = 12` in `build.gradle.kts` wins without a warning, and the ledger would record a code the file does not carry. This step opens each artifact and compares.
+
+| Artifact | Reader | Found by |
+|---|---|---|
+| `.apk` | `aapt2 dump badging` | `PATH`, then the newest `build-tools/` under `ANDROID_HOME`, `ANDROID_SDK_ROOT`, `~/Android/Sdk` or `~/Library/Android/sdk` |
+| `.aab` | `bundletool dump manifest --xpath` | `PATH` only |
+| `.ipa` | `unzip` + `plutil` | `PATH` (macOS) |
+
+Without a reader the step prints a warning and continues; with one, a mismatch stops the build and nothing is recorded. Only the code is compared. A flavor may add a legitimate `versionNameSuffix`, so the name is not.
+
+The same read gives `targetSdkVersion` for APKs and AABs. On a store tier a value below `MIN_TARGET_SDK` stops the build: Play would reject the upload ([10](10-store-gates.md)).
+
+## 12. File artifacts
+
+Each artifact is copied to `OUT_DIR` as before, and its size (`wc -c`) and the first 16 hex digits of its SHA-256 are kept for the ledger. `sha256sum` is used where it exists and `shasum -a 256` otherwise (macOS).
+
+## 13. Record
+
+```bash
+clean() { printf '%s' "$1" | tr '\t\n' '  '; }
+printf '%s\t...\n' \
+  "$start_date" "$tier" "$name" "$code" "$git_sha" "$dep_sha" "$(join "${filed[@]}")" \
+  "$start_time" "$(clean "$branch")" "$flutter_ver" "$target_sdk" \
+  "$(join "${sizes[@]}")" "$(join "${hashes[@]}")" "$(clean "${NOTE:--}")" >> "$ledger"
+```
+
+Written last, so a row means an artifact exists. Tabs and newlines in `NOTE` or a branch name would add columns or rows and corrupt every later read, so they are replaced with spaces. `note` stays the last column so readers can take it as `$NF` in old eight-column rows and new ones.
 
 The script ends by reminding you to commit `tool/versions.tsv` and `pubspec.lock`, and where the debug symbols are.
 

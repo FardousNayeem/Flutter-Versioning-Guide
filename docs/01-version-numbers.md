@@ -52,7 +52,7 @@ A plain integer that only goes up, per application id, satisfies all three. The 
 
 | Change | build name | build number |
 |---|---|---|
-| New release with user-visible changes | Raise per semantic versioning | `--bump` |
+| New release with user-visible changes | `--patch`, `--minor` or `--major` | Taken automatically (these imply `--bump`) |
 | Same release, new build for testers or a store resubmission | Keep | `--bump` |
 | Same code rebuilt for a local test device, never uploaded | Keep | Keep (rebuild in place) |
 | Rebuild of a past release for investigation | Keep | Keep, with `PIN_DEPS=1` and the old commit checked out; do not upload |

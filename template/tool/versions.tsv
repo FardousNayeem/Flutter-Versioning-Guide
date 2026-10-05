@@ -2,10 +2,11 @@
 # appends one row after each successful build. The next build of a tier takes
 # its versionName from that tier's last row and its versionCode from that
 # tier's highest code. Edit by hand only to open a tier or correct history.
+# Read it with tool/ledger.sh.
 #
 # Tab-separated. Columns:
 #
-#   date     build date, YYYY-MM-DD
+#   date     day the build started, YYYY-MM-DD
 #   tier     staging, prod, ... Each tier has its own applicationId and bundle
 #            identifier, so stores and devices count its codes separately.
 #   name     versionName / CFBundleShortVersionString, shown to users
@@ -13,13 +14,22 @@
 #   git      short commit the build started from, +dirty if uncommitted
 #   dep      commit of TRACKED_GIT_DEP the build compiled, or -
 #   filed    artefact file names in OUT_DIR, comma-separated
-#   note     free text from NOTE, or -
+#   time     time the build started, HH:MM:SS with UTC offset
+#   branch   branch the build started from, - for a detached HEAD
+#   flutter  Flutter SDK version that compiled it
+#   sdk      targetSdk read from the artifact, - if it could not be read
+#   bytes    size of each filed artefact, same order as filed
+#   sha256   first 16 hex digits of each filed artefact's SHA-256
+#   note     free text from NOTE, or -. Always the last column.
+#
+# Rows written before the columns from time to sha256 existed have eight
+# columns. They stay valid: the script reads only columns 1 to 4.
 #
 # OPENING A TIER: add one row by hand with the tier's current name and code.
 # For an app already on a store, the code is the highest the store holds for
 # that package; read it from the store console, never guess it. Mark the row
-# in the note column, for example "opening row".
+# in the note column, for example "opening row". Eight columns are enough.
 #
-# date	tier	name	code	git	dep	filed	note
+# date	tier	name	code	git	dep	filed	time	branch	flutter	sdk	bytes	sha256	note
 2026-01-01	staging	1.0.0	1	-	-	-	opening row
 2026-01-01	prod	1.0.0	1	-	-	-	opening row

@@ -30,6 +30,10 @@ cat template/.gitignore >> <your-app>/.gitignore
 tool/build.sh apk --release --dry-run                    # see what it would do
 tool/build.sh apk --release --bump                       # staging APK, next code
 tool/build.sh appbundle --release --tier prod --bump     # production AAB, next code
+tool/build.sh appbundle --release --tier prod --patch    # production AAB, 1.4.2 -> 1.4.3, next code
+
+tool/ledger.sh                                           # last 15 builds
+tool/ledger.sh which ~/Downloads/app.apk                 # which build is this file?
 ```
 
 ## Contents
@@ -45,6 +49,7 @@ tool/build.sh appbundle --release --tier prod --bump     # production AAB, next 
 | [07 CI](docs/07-ci.md) | Running the same script in GitHub Actions and committing the ledger back |
 | [08 Failure catalogue](docs/08-failure-catalogue.md) | Symptom, cause and guard for every failure the script prevents |
 | [09 Adoption checklist](docs/09-adoption-checklist.md) | Steps to move an existing project onto this setup |
+| [10 Store gates](docs/10-store-gates.md) | Requirements that change every year: Play target API, 16 KB pages, Xcode version |
 | [Sources](docs/sources.md) | Official documentation and SDK source the guide relies on |
 
 ## Template
@@ -54,6 +59,7 @@ template/
   tool/build.sh                  the build script
   tool/sync-git-dep.sh           moves and verifies a branch-tracked git dependency
   tool/versions.tsv              the ledger, with two opening rows
+  tool/ledger.sh                 reads the ledger: recent builds, sizes, which row made a file
   config/tiers/staging.json      compile-time values per tier
   config/tiers/prod.json
   lib/core/build_env.dart        typed access to those values, and a startup check
@@ -62,7 +68,7 @@ template/
   .gitignore                     entries the clean-tree check depends on
 ```
 
-Requirements: bash 3.2 or later (macOS default works), git, awk, and python3 for `sync-git-dep.sh` only.
+Requirements: bash 3.2 or later (macOS default works), git, awk, and python3 for `sync-git-dep.sh` only. Optional: `aapt2` (Android SDK build tools, found automatically), `bundletool` or `plutil` to read the version back out of an APK, AAB or IPA.
 
 ## Principles
 

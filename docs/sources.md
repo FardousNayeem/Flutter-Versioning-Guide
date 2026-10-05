@@ -11,6 +11,13 @@
 - Android Developers, Build multiple APKs (ABI splits and version codes): https://developer.android.com/build/configure-apk-splits
 - Apple, Xcode help on version and build numbers: https://help.apple.com/xcode/mac/current/en.lproj/devc092854f5.html
 - Firebase, Get readable crash reports for Flutter (symbol upload): https://firebase.google.com/docs/crashlytics/flutter/get-deobfuscated-reports
+- Android Developers, Meet Google Play's target API level requirement: https://developer.android.com/google/play/requirements/target-sdk
+- Play Console Help, Target API level requirements for Google Play apps: https://support.google.com/googleplay/android-developer/answer/11926878
+- Android Developers, Support 16 KB page sizes: https://developer.android.com/guide/practices/page-sizes
+- Android Developers, zipalign (`-c -P 16` alignment check): https://developer.android.com/tools/zipalign
+- Apple, Upcoming requirements (minimum Xcode and SDK for uploads): https://developer.apple.com/news/upcoming-requirements/
+- bundletool, `dump manifest --xpath`: https://developer.android.com/tools/bundletool
+- Flutter, Measuring your app's size (`--analyze-size`): https://docs.flutter.dev/perf/app-size
 - Codemagic, Automatic build versioning (CI build number strategies): https://docs.codemagic.io/knowledge-codemagic/build-versioning/
 - Codemagic, Importing variables from JSON (`--dart-define-from-file`): https://docs.codemagic.io/knowledge-others/dart-define-from-file-secrets/
 

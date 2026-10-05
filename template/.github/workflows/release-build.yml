@@ -15,9 +15,11 @@ on:
         type: choice
         options: [appbundle, apk]
         default: appbundle
-      version_name:
-        description: New versionName (empty keeps the tier's last one)
-        required: false
+      release:
+        description: versionName change from the tier's last build
+        type: choice
+        options: [none, patch, minor, major]
+        default: none
 
 # One release build at a time across the repository. Two concurrent runs would
 # read the same ledger and take the same code.
@@ -55,10 +57,12 @@ jobs:
 
       - name: Build
         env:
-          VERSION_NAME: ${{ inputs.version_name }}
           NOTE: ci run ${{ github.run_id }}
           OUT_DIR: ${{ github.workspace }}/dist
-        run: tool/build.sh ${{ inputs.target }} --release --tier ${{ inputs.tier }} --bump
+        run: |
+          part=""
+          [ "${{ inputs.release }}" = none ] || part="--${{ inputs.release }}"
+          tool/build.sh ${{ inputs.target }} --release --tier ${{ inputs.tier }} --bump $part
 
       - uses: actions/upload-artifact@v4
         with:
